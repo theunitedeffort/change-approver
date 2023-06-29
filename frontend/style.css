@@ -1,0 +1,50 @@
+.remove {
+	color:red;
+	text-decoration:line-through;
+}
+
+.add {
+	color:green;
+}
+
+.add_highlight {
+	background-color: #abf2bc;
+}
+
+.remove_highlight {
+	background-color: #ffc0c0;
+}
+
+.change {
+	padding-left: 1em;
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+p {
+	padding-left: 1em;
+}
+
+.unit {
+	border: solid #888 2px;
+	border-radius: 6px;
+	margin: 1em 1em 1em 2em;
+	padding: 1em;
+}
+
+.apartment {
+	border-bottom: solid #888 1px;
+}
+
+.approval_options {
+	display: inline-flex;
+}
+
+.approval_options div:first-child input:checked + label {
+	background-color: red;
+}
+
+.approval_options div:last-child input:checked + label {
+	background-color: green;
+}
+
