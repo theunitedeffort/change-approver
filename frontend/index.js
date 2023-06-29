@@ -5,15 +5,16 @@ import './style.css';
 
 const RESPONSES_TABLE = "tblXy0hiHoda5UVSR";
 const UNITS_TABLE = "tblWoxbMLr5iedJ3W"; //"tblRtXBod9CC0mivK";  <- production table
+const REJECTED_CHANGES_TABLE = "tblLykRU1MNNAHv7f";
 const HOUSING_DATABASE_TABLE = "tblq3LUpHcY0ISzxZ"; //"tbl8LUgXQoTYEw2Yh" <- production table
 
 const ctx = createContext();
 
-function Change({field, oldVal, newVal, targetTable, targetRecord}) {
+function Change({field, change, targetTable, targetRecord, rejectTable}) {
   const oldRender = (
     <>
       <span className="remove">
-        {formatFieldValue(field, oldVal)}
+        {formatFieldValue(field, change.existing)}
       </span>
       &nbsp;
     </>
@@ -26,9 +27,14 @@ function Change({field, oldVal, newVal, targetTable, targetRecord}) {
   const [value, setValue] = useState(options[1].value);
   return (
     <div className="change">
-      <Button icon="x" aria-label="Reject" />
+      <Button icon="trash" variant="danger" aria-label="Reject" onClick={() => {
+        rejectTable.createRecordAsync({"KEY": change.key})
+      }} />
       &nbsp;
-      <Button icon="check" aria-label="Approve" onClick={() => targetTable.updateRecordAsync(targetRecord, {[field.name]: newVal})} />
+      <Button icon="thumbsUp" variant="primary" aria-label="Approve" onClick={() => {
+        // convertForField(field, newVal);
+        targetTable.updateRecordAsync(targetRecord, {[field.name]: convertForField(field, change.updated)});
+      }} />
 {/*      <SelectButtons
         className="approval_options"
         value={value}
@@ -38,9 +44,9 @@ function Change({field, oldVal, newVal, targetTable, targetRecord}) {
       />*/}
       &nbsp;
       <strong>{field.name}</strong>:&nbsp;
-      {oldVal ? oldRender : ""}
+      {change.existing ? oldRender : ""}
       <span className="add">
-        {formatFieldValue(field, newVal)}
+        {formatFieldValue(field, change.updated)}
       </span>
     </div>
   );
@@ -75,8 +81,7 @@ function Unit({unit, fieldMap}) {
       {Object.keys(unit.changes).map(fieldName => {
         return <Change
           field={fieldMap[fieldName]}
-          oldVal={unit.changes[fieldName].existing}
-          newVal={unit.changes[fieldName].updated}
+          change={unit.changes[fieldName]}
         />
       })}
     </BaseUnit>
@@ -110,7 +115,7 @@ function Metadata({response, housing}) {
   );
 }
 
-function Apartment({response, housing, fieldMap, unitsFieldMap, housingTable, approvalCallback}) {
+function Apartment({response, housing, fieldMap, unitsFieldMap, housingTable, rejectTable, approvalCallback}) {
   // Find any newly deleted units by comparing the unit IDs in the response
   // data with the unit IDs in Airtable for this apartment.
   const existingUnits = housing[response.housing.ID].getCellValue("UNITS");
@@ -141,10 +146,10 @@ function Apartment({response, housing, fieldMap, unitsFieldMap, housingTable, ap
         return (
           <Change
             field={fieldMap[fieldName]}
-            oldVal={response.housing.changes[fieldName].existing}
-            newVal={response.housing.changes[fieldName].updated}
+            change={response.housing.changes[fieldName]}
             targetTable={housingTable}
             targetRecord={housing[response.housing.ID]}
+            rejectTable={rejectTable}
           />
         );
       })}
@@ -226,6 +231,17 @@ function fieldValuesEqual(field, existingVal, updatedVal) {
   return existing.trim() === updated.trim();
 }
 
+// Converts a string value to the proper type for writing to a field
+function convertForField(field, val) {
+  const strVal = val;
+  const converted = field.convertStringToCellValue(strVal);
+  if (converted === null && strVal) {
+    throw(
+      `Error converting ${JSON.stringify(val)} for storage in ${field.name}`);
+  }
+  return converted;
+}
+
 // Formats a field value for printing and display.
 function formatFieldValue(field, val) {
   if (field.type == "checkbox") {
@@ -291,6 +307,7 @@ function RecordActionData({data}) {
   let changesTable = base.getTable(RESPONSES_TABLE);
   let housingDbTable = base.getTable(HOUSING_DATABASE_TABLE);
   let unitsTable = base.getTable(UNITS_TABLE);
+  let rejectTable = base.getTable(REJECTED_CHANGES_TABLE);
 
 
   // Build the Airtable fields hash maps indexed by field name.
@@ -306,16 +323,24 @@ function RecordActionData({data}) {
   // Build the housing data hash map indexed by Airtable ID.
   let housing = {};
   let housingRecords = useRecords(housingDbTable);
-  for(let record of housingRecords) {
+  for (let record of housingRecords) {
     housing[record.getCellValueAsString("ID")] = record;
   }
 
   // Build the units data hash map indexed by Airtable ID.
   let units = {};
   let unitsRecords = useRecords(unitsTable);
-  for(let record of unitsRecords) {
+  for (let record of unitsRecords) {
     units[record.getCellValueAsString("ID")] = record;
   }
+
+  // Build the rejected changes list.
+  let rejects = [];
+  let rejectRecords = useRecords(rejectTable);
+  for (const record of rejectRecords) {
+    rejects.push(record.getCellValueAsString("KEY"));
+  }
+  console.log(rejects);
 
   // Get all form responses submitted to date.
   let formResponses = useRecords(changesTable,
@@ -333,7 +358,7 @@ function RecordActionData({data}) {
       continue;
     }
     let response = JSON.parse(record.getCellValue("FORM_RESPONSE_JSON"));
-    responseData[response.ID] = {housing: {}, units: {}, rawJson: response};
+    responseData[response.ID] = {housing: {}, units: {}, rawJson: response, responseRecordId: record.id};
     // Un-flatten form response data by nesting offering-level data inside
     // their parent unit and units-level data inside their parent apartment.
     // First, we sort data into apartment, unit, or offering-level.
@@ -422,15 +447,21 @@ function RecordActionData({data}) {
       if (!responseData[housingId].housing.hasOwnProperty(dbField)) {
         continue;
       }
-      let existingVal = housing[housingId].getCellValueAsString(
-        dbField);
+      let existingVal = housing[housingId].getCellValueAsString(dbField);
+      // TODO: Filter out changes that have been rejected in the past.
+      // change key format is responseID:housingId:unitIdx:fieldName
+      const changeKey = `${responseData[housingId].responseRecordId}:${housingId}:-:${dbField}`;
       let newVal = responseData[housingId].housing[dbField];
+      if (rejects.includes(changeKey)) {
+        console.log(`rejecting ${changeKey}`);
+        newVal = existingVal;
+      }
       if (!fieldValuesEqual(housingFieldsByName[dbField], existingVal, newVal)) {
         responseData[housingId].housing.changes[dbField] = {
-          existing: existingVal, updated: newVal};
+          existing: existingVal, updated: newVal, key: changeKey};
       }
     }
-    for (let unit of responseData[housingId].units) {
+    for (let [idx, unit] of responseData[housingId].units.entries()) {
       let unitChanges = {};
       let unitId = unit.ID || ""
       unit.changes = {};
@@ -440,14 +471,18 @@ function RecordActionData({data}) {
         }
         let existingVal = "";
         if (unitId) {
-          existingVal = units[unitId].getCellValueAsString(
-            dbField);
+          existingVal = units[unitId].getCellValueAsString(dbField);
         }
+        const changeKey = `${responseData[housingId].responseRecordId}:${housingId}:${idx}:${dbField}`;
         let newVal = unit[dbField];
+        if (rejects.includes(changeKey)) {
+          console.log(`rejecting ${changeKey}`);
+          newVal = existingVal;
+        }
         // TODO: possibly omit the 'existing' for new entries.
         if (!fieldValuesEqual(unitFieldsByName[dbField], existingVal, newVal)) {
           unit.changes[dbField] = {
-            existing: existingVal, updated: newVal};
+            existing: existingVal, updated: newVal, key: changeKey};
         }
       }
     }
@@ -515,6 +550,7 @@ function RecordActionData({data}) {
           fieldMap={housingFieldsByName}
           unitsFieldMap={unitFieldsByName}
           housingTable={housingDbTable}
+          rejectTable={rejectTable}
           approvalCallback={handleApproval} />
       })}
       {/*<div dangerouslySetInnerHTML={{__html: htmlStrs.join("")}} />*/}
