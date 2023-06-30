@@ -36,6 +36,39 @@ p {
 	padding: 1em;
 }
 
+.unit_record_card {
+	width: 100% !important;
+}
+
+.unit_record_card > div > div:nth-child(2) {
+	width: 100%;
+}
+
+.unit_record_card > div > div:nth-child(2) > div:first-child:nth-last-child(1),
+.unit_record_card > div > div:nth-child(2) > div:first-child:nth-last-child(1) ~ div {
+	width: 100% !important;
+}
+
+.unit_record_card > div > div:nth-child(2) > div:first-child:nth-last-child(2),
+.unit_record_card > div > div:nth-child(2) > div:first-child:nth-last-child(2) ~ div {
+	width: 50% !important;
+}
+
+.unit_record_card > div > div:nth-child(2) > div:first-child:nth-last-child(3),
+.unit_record_card > div > div:nth-child(2) > div:first-child:nth-last-child(3) ~ div {
+	width: 33% !important;
+}
+
+.unit_record_card > div > div:nth-child(2) > div:first-child:nth-last-child(4),
+.unit_record_card > div > div:nth-child(2) > div:first-child:nth-last-child(4) ~ div {
+	width: 25% !important;
+}
+
+.unit_record_card > div > div:nth-child(2) > div:first-child:nth-last-child(5),
+.unit_record_card > div > div:nth-child(2) > div:first-child:nth-last-child(5) ~ div {
+	width: 20% !important;
+}
+
 .apartment {
 	border-bottom: solid #888 1px;
 }

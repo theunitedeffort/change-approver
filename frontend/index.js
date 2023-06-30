@@ -48,32 +48,45 @@ function Change({field, change, targetTable, targetRecord, rejectTable, linkedHo
   );
 }
 
-function BaseUnit({header, children}) {
+function BaseUnit({header, card, children}) {
   return (
     <div className="unit">
-      <h3>
-        {header}
-      </h3>
+      <h3>{header}</h3>
+      {card}
       {children}
     </div>
   );
 }
 
 function DeletedUnit({deletedId}) {
-  const header = <span className="remove_highlight">Deleted Unit ID {deletedId}</span>;
+  const header = <h3><span className="remove_highlight">Deleted Unit ID {deletedId}</span></h3>;
   return <BaseUnit header={header}/>;
 }
 
 function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}) {
-  let unitHeading = <span className="add_highlight">New Unit</span>;
+  let unitHeading = <h3><span className="add_highlight">New Unit</span></h3>;
+  let card = null;
   if (unit.ID) {
-    unitHeading = `Unit ID ${unit.ID}`;
+    unitHeading = (
+      <TextButton onClick={() => expandRecord(units[unit.ID])} icon="expand">
+        {`Unit ID ${unit.ID}`}
+      </TextButton>
+    );
+    card = <RecordCard
+      className="unit_record_card"
+      record={units[unit.ID]}
+      fields={[
+        fieldMap["TYPE"],
+        fieldMap["PERCENT_AMI"],
+        fieldMap["RENT_PER_MONTH_USD"],
+      ]}
+    />;
   }
   if (!Object.keys(unit.changes).length) {
     return null;
   }
   return (
-    <BaseUnit header={unitHeading}>
+    <BaseUnit header={unitHeading} card={card}>
       {Object.keys(unit.changes).map(fieldName => {
         return <Change
           field={fieldMap[fieldName]}
