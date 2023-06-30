@@ -1,3 +1,7 @@
+button {
+	margin: 0.2em;
+}
+
 .remove {
 	color:red;
 	text-decoration:line-through;

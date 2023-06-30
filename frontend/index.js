@@ -1,4 +1,4 @@
-import {Icon, Box, Button, TextButton, SelectButtons, initializeBlock, useRecordActionData, useBase, useRecordById, useRecords, expandRecord} from '@airtable/blocks/ui';
+import {Icon, Box, Button, TextButton, RecordCard, SelectButtons, initializeBlock, useRecordActionData, useBase, useRecordById, useRecords, expandRecord} from '@airtable/blocks/ui';
 import React, { useState, createContext, useContext } from "react";
 
 import './style.css';
@@ -10,7 +10,7 @@ const HOUSING_DATABASE_TABLE = "tblq3LUpHcY0ISzxZ"; //"tbl8LUgXQoTYEw2Yh" <- pro
 
 const ctx = createContext();
 
-function Change({field, change, targetTable, targetRecord, rejectTable}) {
+function Change({field, change, targetTable, targetRecord, rejectTable, linkedHousingRec, housingLinkField}) {
   const oldRender = (
     <>
       <span className="remove">
@@ -19,30 +19,26 @@ function Change({field, change, targetTable, targetRecord, rejectTable}) {
       &nbsp;
     </>
   );
-  const options = [
-    { value: "reject", label: <Icon name="x" size={16} /> },
-    { value: "neutral", label: " " },
-    { value: "approve", label: <Icon name="check" size={16} /> },
-  ];
-  const [value, setValue] = useState(options[1].value);
   return (
     <div className="change">
-      <Button icon="trash" variant="danger" aria-label="Reject" onClick={() => {
+      <Button size="small" icon="trash" variant="danger" aria-label="Reject" onClick={() => {
         rejectTable.createRecordAsync({"KEY": change.key})
       }} />
-      &nbsp;
-      <Button icon="thumbsUp" variant="primary" aria-label="Approve" onClick={() => {
+      <Button size="small" icon="thumbsUp" variant="primary" aria-label="Approve" onClick={() => {
         // convertForField(field, newVal);
-        targetTable.updateRecordAsync(targetRecord, {[field.name]: convertForField(field, change.updated)});
+        if (targetRecord) {
+          targetTable.updateRecordAsync(targetRecord, {[field.name]: convertForField(field, change.updated)});
+        } else {
+          // TODO: add a new field that links the new unit back to the response id and unit index.
+          console.log(linkedHousingRec);
+          targetTable.createRecordAsync({
+            'HOUSING_LIST_ID': [{id: linkedHousingRec.id}],
+            // Remove field name portion of the change key so it applies to the
+            // unit record as a whole.
+            'TEMP_ID': change.key.split(':').slice(0, 3).join(':'),
+            [field.name]: convertForField(field, change.updated)});
+        }
       }} />
-{/*      <SelectButtons
-        className="approval_options"
-        value={value}
-        onChange={newValue => setValue(newValue)}
-        options={options}
-        width="100px"
-      />*/}
-      &nbsp;
       <strong>{field.name}</strong>:&nbsp;
       {change.existing ? oldRender : ""}
       <span className="add">
@@ -68,7 +64,7 @@ function DeletedUnit({deletedId}) {
   return <BaseUnit header={header}/>;
 }
 
-function Unit({unit, fieldMap}) {
+function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}) {
   let unitHeading = <span className="add_highlight">New Unit</span>;
   if (unit.ID) {
     unitHeading = `Unit ID ${unit.ID}`;
@@ -82,6 +78,11 @@ function Unit({unit, fieldMap}) {
         return <Change
           field={fieldMap[fieldName]}
           change={unit.changes[fieldName]}
+          targetTable={unitsTable}
+          targetRecord={units[unit.ID]}
+          rejectTable={rejectTable}
+          linkedHousingRec={linkedHousingRec}
+          housingLinkField={fieldMap['HOUSING_LIST_ID']}
         />
       })}
     </BaseUnit>
@@ -115,7 +116,7 @@ function Metadata({response, housing}) {
   );
 }
 
-function Apartment({response, housing, fieldMap, unitsFieldMap, housingTable, rejectTable, approvalCallback}) {
+function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTable, unitsTable, rejectTable}) {
   // Find any newly deleted units by comparing the unit IDs in the response
   // data with the unit IDs in Airtable for this apartment.
   const existingUnits = housing[response.housing.ID].getCellValue("UNITS");
@@ -154,7 +155,13 @@ function Apartment({response, housing, fieldMap, unitsFieldMap, housingTable, re
         );
       })}
       {response.units.map(unit => {
-        return <Unit unit={unit} fieldMap={unitsFieldMap}/>
+        return <Unit
+          unit={unit}
+          fieldMap={unitsFieldMap}
+          unitsTable={unitsTable}
+          rejectTable={rejectTable}
+          linkedHousingRec={housing[response.housing.ID]}
+          units={units} />
       })}
       {deletedUnitIds.map(deletedId => {
         return <DeletedUnit deletedId={deletedId}/>
@@ -233,8 +240,10 @@ function fieldValuesEqual(field, existingVal, updatedVal) {
 
 // Converts a string value to the proper type for writing to a field
 function convertForField(field, val) {
-  const strVal = val;
+  const strVal = val.toString();
+  console.log(strVal);
   const converted = field.convertStringToCellValue(strVal);
+  console.log(converted);
   if (converted === null && strVal) {
     throw(
       `Error converting ${JSON.stringify(val)} for storage in ${field.name}`);
@@ -284,14 +293,6 @@ function RecordActionDataDemoBlock() {
 }
 
 function RecordActionData({data}) {
-  const [pendingUpdates, setPendingUpdates] = useState([]);
-
-  function handleApproval(change) {
-    setPendingUpdates([
-      ...pendingUpdates,
-      change]);
-  }
-
   const base = useBase();
   const table = base.getTableByIdIfExists(data.tableId);
   const view = table && table.getViewByIdIfExists(data.viewId);
@@ -329,9 +330,14 @@ function RecordActionData({data}) {
 
   // Build the units data hash map indexed by Airtable ID.
   let units = {};
+  let unitsByTempId = {};
   let unitsRecords = useRecords(unitsTable);
   for (let record of unitsRecords) {
     units[record.getCellValueAsString("ID")] = record;
+    const tempId = record.getCellValueAsString("TEMP_ID");
+    if (tempId) {
+      unitsByTempId[tempId] = record;
+    }
   }
 
   // Build the rejected changes list.
@@ -463,17 +469,22 @@ function RecordActionData({data}) {
     }
     for (let [idx, unit] of responseData[housingId].units.entries()) {
       let unitChanges = {};
+      const unitKey = (
+        `${responseData[housingId].responseRecordId}:${housingId}:${idx}`);
+      if (!unit.ID && unitsByTempId[unitKey]) {
+        unit.ID = unitsByTempId[unitKey].getCellValueAsString("ID");
+      }
       let unitId = unit.ID || ""
       unit.changes = {};
       for (let dbField in unitFieldsByName) {
         if (!unit.hasOwnProperty(dbField)) {
           continue;
         }
+        const changeKey = `${unitKey}:${dbField}`;
         let existingVal = "";
         if (unitId) {
           existingVal = units[unitId].getCellValueAsString(dbField);
         }
-        const changeKey = `${responseData[housingId].responseRecordId}:${housingId}:${idx}:${dbField}`;
         let newVal = unit[dbField];
         if (rejects.includes(changeKey)) {
           console.log(`rejecting ${changeKey}`);
@@ -490,56 +501,56 @@ function RecordActionData({data}) {
 
   console.log(responseData);
 
-  let htmlStrs = [];
-  for (let housingId in responseData) {
-    let changeStrs = [];
-    let metadataStrs = [];
-    // Render changes to the Housing Database table
-    for (let fieldName in responseData[housingId].housing.changes) {
-      changeStrs.push(`<p style="padding-left:1em"><strong>${fieldName}</strong>: <span style="color:red; text-decoration:line-through">${formatFieldValue(housingFieldsByName[fieldName], responseData[housingId].housing.changes[fieldName].existing)}</span> <span style="color:green">${formatFieldValue(housingFieldsByName[fieldName], responseData[housingId].housing.changes[fieldName].updated)}</span></p>`);
-    }
-    // Render changes to the Units table
-    for (let unit of responseData[housingId].units) {
-      let unitStrs = []
-      let unitHeading = `<span style="background-color:#abf2bc">New Unit</span>`;
-      if (unit.ID) {
-        unitHeading = `Unit ID ${unit.ID}`;
-      }
-      for (let fieldName in unit.changes) {
-        unitStrs.push(`<p style="padding-left:1em"><strong>${fieldName}</strong>: <span style="color:red; text-decoration:line-through">${formatFieldValue(unitFieldsByName[fieldName], unit.changes[fieldName].existing)}</span> <span style="color:green">${formatFieldValue(unitFieldsByName[fieldName], unit.changes[fieldName].updated)}</span></p>`);
-      }
-      if (unitStrs.length) {
-        changeStrs.push(`<div style="border:solid #888 2px; border-radius:6px; margin:1em 1em 1em 2em; padding: 1em;"><h3>${unitHeading}</h3>${unitStrs.join("")}</div>`);
-      }
-    }
-    // Render any newly deleted units by comparing the unit IDs in the response
-    // data with the unit IDs in Airtable for this apartment.
-    const existingUnits = housing[housingId].getCellValue("UNITS");
-    let existingUnitIds = [];
-    // For some reason getCellValue can return null instead of an empty list of linked records.
-    if (existingUnits) {
-      existingUnitIds = existingUnits.map(u => u.name);
-    }
-    let updatedUnitIds = responseData[housingId].units.map(u => u.ID).filter(i => i);
-    let deletedUnitIds = existingUnitIds.filter(i => !updatedUnitIds.includes(i));
-    for (let deletedUnitId of deletedUnitIds) {
-      changeStrs.push(`<div style="border:solid #888 2px; border-radius:6px; margin:1em 1em 1em 2em; padding: 1em;"><h3><span style="background-color:#ffc0c0">Deleted Unit ID ${deletedUnitId}</span></h3></div>`);
-    }
+  // let htmlStrs = [];
+  // for (let housingId in responseData) {
+  //   let changeStrs = [];
+  //   let metadataStrs = [];
+  //   // Render changes to the Housing Database table
+  //   for (let fieldName in responseData[housingId].housing.changes) {
+  //     changeStrs.push(`<p style="padding-left:1em"><strong>${fieldName}</strong>: <span style="color:red; text-decoration:line-through">${formatFieldValue(housingFieldsByName[fieldName], responseData[housingId].housing.changes[fieldName].existing)}</span> <span style="color:green">${formatFieldValue(housingFieldsByName[fieldName], responseData[housingId].housing.changes[fieldName].updated)}</span></p>`);
+  //   }
+  //   // Render changes to the Units table
+  //   for (let unit of responseData[housingId].units) {
+  //     let unitStrs = []
+  //     let unitHeading = `<span style="background-color:#abf2bc">New Unit</span>`;
+  //     if (unit.ID) {
+  //       unitHeading = `Unit ID ${unit.ID}`;
+  //     }
+  //     for (let fieldName in unit.changes) {
+  //       unitStrs.push(`<p style="padding-left:1em"><strong>${fieldName}</strong>: <span style="color:red; text-decoration:line-through">${formatFieldValue(unitFieldsByName[fieldName], unit.changes[fieldName].existing)}</span> <span style="color:green">${formatFieldValue(unitFieldsByName[fieldName], unit.changes[fieldName].updated)}</span></p>`);
+  //     }
+  //     if (unitStrs.length) {
+  //       changeStrs.push(`<div style="border:solid #888 2px; border-radius:6px; margin:1em 1em 1em 2em; padding: 1em;"><h3>${unitHeading}</h3>${unitStrs.join("")}</div>`);
+  //     }
+  //   }
+  //   // Render any newly deleted units by comparing the unit IDs in the response
+  //   // data with the unit IDs in Airtable for this apartment.
+  //   const existingUnits = housing[housingId].getCellValue("UNITS");
+  //   let existingUnitIds = [];
+  //   // For some reason getCellValue can return null instead of an empty list of linked records.
+  //   if (existingUnits) {
+  //     existingUnitIds = existingUnits.map(u => u.name);
+  //   }
+  //   let updatedUnitIds = responseData[housingId].units.map(u => u.ID).filter(i => i);
+  //   let deletedUnitIds = existingUnitIds.filter(i => !updatedUnitIds.includes(i));
+  //   for (let deletedUnitId of deletedUnitIds) {
+  //     changeStrs.push(`<div style="border:solid #888 2px; border-radius:6px; margin:1em 1em 1em 2em; padding: 1em;"><h3><span style="background-color:#ffc0c0">Deleted Unit ID ${deletedUnitId}</span></h3></div>`);
+  //   }
 
-    // Even if no changes were submitted, ensure that notes to the reviwer make it into the summary email.
-    if (changeStrs.length || responseData[housingId].rawJson.userNotes) {
-      metadataStrs.push(`ID ${housingId}`);
-      metadataStrs.push(`Display ID ${housing[housingId].getCellValueAsString("DISPLAY_ID")}`);
-      if (responseData[housingId].rawJson.user_name){
-        metadataStrs.push(`Submitted by ${responseData[housingId].rawJson.user_name}`);
-      }
-      if (responseData[housingId].rawJson.userNotes) {
-        metadataStrs.push(`Notes to reviewer: "${formatFieldValue({type:"multilineText"}, responseData[housingId].rawJson.userNotes)}"`);
-      }
-      let recordLink = `https://airtable.com/apphE4mk8YDqyHM0I/tblq3LUpHcY0ISzxZ/viw8aa14PoQNBYQgX/${housing[housingId].id}?blocks=hide`
-      htmlStrs.push(`<div style="border-bottom:solid #888 1px;"><h2><a href="${recordLink}" target="_blank" rel="noopener">${housing[housingId].getCellValueAsString("APT_NAME")}</a></h2>${metadataStrs.join("<br/>")}${changeStrs.join("")}</div>`);
-    }
-  }
+  //   // Even if no changes were submitted, ensure that notes to the reviwer make it into the summary email.
+  //   if (changeStrs.length || responseData[housingId].rawJson.userNotes) {
+  //     metadataStrs.push(`ID ${housingId}`);
+  //     metadataStrs.push(`Display ID ${housing[housingId].getCellValueAsString("DISPLAY_ID")}`);
+  //     if (responseData[housingId].rawJson.user_name){
+  //       metadataStrs.push(`Submitted by ${responseData[housingId].rawJson.user_name}`);
+  //     }
+  //     if (responseData[housingId].rawJson.userNotes) {
+  //       metadataStrs.push(`Notes to reviewer: "${formatFieldValue({type:"multilineText"}, responseData[housingId].rawJson.userNotes)}"`);
+  //     }
+  //     let recordLink = `https://airtable.com/apphE4mk8YDqyHM0I/tblq3LUpHcY0ISzxZ/viw8aa14PoQNBYQgX/${housing[housingId].id}?blocks=hide`
+  //     htmlStrs.push(`<div style="border-bottom:solid #888 1px;"><h2><a href="${recordLink}" target="_blank" rel="noopener">${housing[housingId].getCellValueAsString("APT_NAME")}</a></h2>${metadataStrs.join("<br/>")}${changeStrs.join("")}</div>`);
+  //   }
+  // }
 
   return (
     <Box padding={4} style={{height: "100vh", width: "100%"}}>
@@ -547,11 +558,13 @@ function RecordActionData({data}) {
         return <Apartment
           response={responseData[housingId]}
           housing={housing}
+          units={units}
           fieldMap={housingFieldsByName}
           unitsFieldMap={unitFieldsByName}
           housingTable={housingDbTable}
+          unitsTable={unitsTable}
           rejectTable={rejectTable}
-          approvalCallback={handleApproval} />
+        />
       })}
       {/*<div dangerouslySetInnerHTML={{__html: htmlStrs.join("")}} />*/}
     </Box>
