@@ -30,7 +30,6 @@ function Change({field, change, targetTable, targetRecord, rejectTable, linkedHo
           targetTable.updateRecordAsync(targetRecord, {[field.name]: convertForField(field, change.updated)});
         } else {
           // TODO: add a new field that links the new unit back to the response id and unit index.
-          console.log(linkedHousingRec);
           targetTable.createRecordAsync({
             'HOUSING_LIST_ID': [{id: linkedHousingRec.id}],
             // Remove field name portion of the change key so it applies to the
@@ -207,7 +206,6 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
     <div className="apartment">
       <h2>
         <TextButton onClick={() => {
-          console.log(housing[response.housing.ID]);
           expandRecord(housing[response.housing.ID]);
         }} icon="expand" size="xlarge">
           {housing[response.housing.ID].getCellValueAsString("APT_NAME")}
@@ -322,9 +320,7 @@ function fieldValuesEqual(field, existingVal, updatedVal) {
 // Converts a string value to the proper type for writing to a field
 function convertForField(field, val) {
   const strVal = val.toString();
-  console.log(strVal);
   const converted = field.convertStringToCellValue(strVal);
-  console.log(converted);
   if (converted === null && strVal) {
     throw(
       `Error converting ${JSON.stringify(val)} for storage in ${field.name}`);
@@ -427,7 +423,6 @@ function RecordActionData({data}) {
   for (const record of rejectRecords) {
     rejects.push(record.getCellValueAsString("KEY"));
   }
-  console.log(rejects);
 
   // Get all form responses submitted to date.
   let formResponses = useRecords(changesTable,
@@ -554,7 +549,6 @@ function RecordActionData({data}) {
       const changeKey = `${responseData[housingId].responseRecordId}:${housingId}:-:${dbField}`;
       let newVal = responseData[housingId].housing[dbField];
       if (rejects.includes(changeKey)) {
-        console.log(`rejecting ${changeKey}`);
         newVal = existingVal;
       }
       if (!fieldValuesEqual(housingFieldsByName[dbField], existingVal, newVal)) {
@@ -582,7 +576,6 @@ function RecordActionData({data}) {
         }
         let newVal = unit[dbField];
         if (rejects.includes(changeKey)) {
-          console.log(`rejecting ${changeKey}`);
           newVal = existingVal;
         }
         // TODO: possibly omit the 'existing' for new entries.
