@@ -119,6 +119,10 @@ function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}
   }
   return (
     <BaseUnit header={unitHeading} card={card}>
+      <p>
+        <Button icon="x" variant="danger">Reject all</Button>
+        <Button icon="thumbsUp" variant="primary">Approve all</Button>
+      </p>
       {Object.keys(unit.changes).map(fieldName => {
         const change = unit.changes[fieldName];
         return <Change
