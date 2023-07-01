@@ -1,5 +1,5 @@
 import {Icon, Box, Button, TextButton, RecordCard, SelectButtons, initializeBlock, useRecordActionData, useBase, useRecordById, useRecords, expandRecord} from '@airtable/blocks/ui';
-import React, { useState, createContext, useContext } from "react";
+import React, { useState, createContext, useContext, useRef } from "react";
 
 import './style.css';
 
@@ -21,10 +21,10 @@ function Change({field, change, targetTable, targetRecord, rejectTable, linkedHo
   );
   return (
     <div className="change">
-      <Button size="small" icon="x" variant="danger" aria-label="Reject" onClick={() => {
+      <Button className="reject" size="small" icon="x" variant="danger" aria-label="Reject" onClick={() => {
         rejectTable.createRecordAsync({"KEY": change.key})
       }} />
-      <Button size="small" icon="thumbsUp" variant="primary" aria-label="Approve" onClick={() => {
+      <Button className="approve" size="small" icon="thumbsUp" variant="primary" aria-label="Approve" onClick={() => {
         // convertForField(field, newVal);
         if (targetRecord) {
           targetTable.updateRecordAsync(targetRecord, {[field.name]: convertForField(field, change.updated)});
@@ -96,6 +96,7 @@ function DeletedUnit({deletedId, fieldMap, unitsTable, rejectTable, units, chang
 }
 
 function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}) {
+  const containerRef = useRef(null);
   let unitHeading = <span className="add_highlight">New Unit</span>;
   let card = null;
   if (unit.ID) {
@@ -120,9 +121,24 @@ function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}
   return (
     <BaseUnit header={unitHeading} card={card}>
       <p>
-        <Button icon="x" variant="danger">Reject all</Button>
-        <Button icon="thumbsUp" variant="primary">Approve all</Button>
+        <Button icon="x" variant="danger" onClick={() => {
+          const buttons = containerRef.current.querySelectorAll('.reject');
+          for (const button of buttons) {
+            button.click();
+          }
+        }}>
+          Reject all
+        </Button>
+        <Button icon="thumbsUp" variant="primary" onClick={() => {
+          const buttons = containerRef.current.querySelectorAll('.approve');
+          for (const button of buttons) {
+            button.click();
+          }
+        }}>
+          Approve all
+        </Button>
       </p>
+      <div ref={containerRef}>
       {Object.keys(unit.changes).map(fieldName => {
         const change = unit.changes[fieldName];
         return <Change
@@ -136,6 +152,7 @@ function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}
           housingLinkField={fieldMap['HOUSING_LIST_ID']}
         />
       })}
+      </div>
     </BaseUnit>
   );
 }
@@ -189,7 +206,10 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
   return (
     <div className="apartment">
       <h2>
-        <TextButton onClick={() => expandRecord(housing[response.housing.ID])} icon="expand" size="xlarge">
+        <TextButton onClick={() => {
+          console.log(housing[response.housing.ID]);
+          expandRecord(housing[response.housing.ID]);
+        }} icon="expand" size="xlarge">
           {housing[response.housing.ID].getCellValueAsString("APT_NAME")}
         </TextButton>
       </h2>
