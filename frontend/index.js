@@ -120,9 +120,11 @@ function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}
   return (
     <BaseUnit header={unitHeading} card={card}>
       {Object.keys(unit.changes).map(fieldName => {
+        const change = unit.changes[fieldName];
         return <Change
+          key={change.key}
           field={fieldMap[fieldName]}
-          change={unit.changes[fieldName]}
+          change={change}
           targetTable={unitsTable}
           targetRecord={units[unit.ID]}
           rejectTable={rejectTable}
@@ -146,9 +148,9 @@ function Metadata({response, housing}) {
   }
   if (response.rawJson.userNotes) {
     notesRender = (
-      <>
+      <span class="notes">
         Notes to reviewer: "{formatFieldValue({type:"multilineText"}, response.rawJson.userNotes)}"<br/>
-      </>
+      </span>
     );
   }
   return (
@@ -189,10 +191,12 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
       </h2>
       <Metadata response={response} housing={housing} />
       {Object.keys(response.housing.changes).map(fieldName => {
+        const change = response.housing.changes[fieldName];
         return (
           <Change
+            key={change.key}
             field={fieldMap[fieldName]}
-            change={response.housing.changes[fieldName]}
+            change={change}
             targetTable={housingTable}
             targetRecord={housing[response.housing.ID]}
             rejectTable={rejectTable}
@@ -210,6 +214,7 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
       })}
       {deletedUnitIds.map(deletedId => {
         return <DeletedUnit
+          key={deletedId}
           deletedId={deletedId}
           fieldMap={unitsFieldMap}
           unitsTable={unitsTable}
@@ -622,6 +627,7 @@ function RecordActionData({data}) {
     <Box padding={4} style={{height: "100vh", width: "100%"}}>
       {Object.keys(responseData).map(housingId => {
         return <Apartment
+          key={housingId}
           response={responseData[housingId]}
           housing={housing}
           units={units}
