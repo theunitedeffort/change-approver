@@ -21,7 +21,7 @@ function Change({field, change, targetTable, targetRecord, rejectTable, linkedHo
   );
   return (
     <div className="change">
-      <Button size="small" icon="trash" variant="danger" aria-label="Reject" onClick={() => {
+      <Button size="small" icon="x" variant="danger" aria-label="Reject" onClick={() => {
         rejectTable.createRecordAsync({"KEY": change.key})
       }} />
       <Button size="small" icon="thumbsUp" variant="primary" aria-label="Approve" onClick={() => {
@@ -58,13 +58,45 @@ function BaseUnit({header, card, children}) {
   );
 }
 
-function DeletedUnit({deletedId}) {
-  const header = <h3><span className="remove_highlight">Deleted Unit ID {deletedId}</span></h3>;
-  return <BaseUnit header={header}/>;
+function DeletedUnit({deletedId, fieldMap, unitsTable, rejectTable, units, changeKey}) {
+  const header = (
+    <TextButton onClick={() => expandRecord(units[deletedId])} icon="expand">
+      {`Unit ID ${deletedId}`}
+    </TextButton>
+  );
+  let card = <p>Deleting...</p>;
+  if (units[deletedId]) {
+    card = <RecordCard
+      className="unit_record_card"
+      record={units[deletedId]}
+      fields={[
+        fieldMap["TYPE"],
+        fieldMap["PERCENT_AMI"],
+        fieldMap["RENT_PER_MONTH_USD"],
+      ]}
+    />;
+  }
+  return (
+    <BaseUnit header={header} card={card}>
+      <div className="change">
+        <Button style={{display: "none"}} size="small" icon="x" variant="danger" aria-label="Reject" onClick={() => {
+          // TODO: If a unit deletion is rejected and there are also edits
+          // to the type, status, or occupancy, how do we apply those changes
+          // after the rejection?  For now, hide the reject option until that
+          // gets figured out.
+          rejectTable.createRecordAsync({"KEY": `${changeKey}:DELETE`})
+        }} />
+        <Button size="small" icon="thumbsUp" variant="primary" aria-label="Approve" onClick={() => {
+          unitsTable.deleteRecordAsync(units[deletedId]);
+        }} />
+        <span class="remove_highlight">Delete this unit record</span>
+      </div>
+    </BaseUnit>
+  );
 }
 
 function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}) {
-  let unitHeading = <h3><span className="add_highlight">New Unit</span></h3>;
+  let unitHeading = <span className="add_highlight">New Unit</span>;
   let card = null;
   if (unit.ID) {
     unitHeading = (
@@ -177,7 +209,14 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
           units={units} />
       })}
       {deletedUnitIds.map(deletedId => {
-        return <DeletedUnit deletedId={deletedId}/>
+        return <DeletedUnit
+          deletedId={deletedId}
+          fieldMap={unitsFieldMap}
+          unitsTable={unitsTable}
+          rejectTable={rejectTable}
+          units={units}
+          changeKey={`${response.responseRecordId}:${response.housing.ID}:${deletedId}`}
+        />
       })}
     </div>
   );
@@ -414,6 +453,12 @@ function RecordActionData({data}) {
       }
     }
 
+    // Inject the offering-level data for this existing unit ID into the
+    // offerings object to pretend the proposed deletion never happened.
+    // Need to figure out which unit to inject it under, or potentially create a new unit?
+    // Doing this prior to nesting may be easier...
+    // TODO
+
     // The data entry form has a flat structure, so there are many available "slots"
     // in the form for units.  It's likely that not every set of unit-level fields
     // will be filled. Prune units and offerings to only include those with data.
@@ -450,6 +495,14 @@ function RecordActionData({data}) {
         }
       }
     }
+
+    // Check for any units with a rejected proposal for deletion.
+    // TODO: Figure out what to do after finding the rejected deletes.
+    const rejectedDeletes = rejects.filter(
+      r => r.match(new RegExp(`${record.id}:${response.ID}:(\\d+):DELETE`)));
+    for (const rejectedDelete of rejectedDeletes) {
+      const unitId = rejectedDelete[1];
+    }
     responseData[response.ID].units = flatUnits;
   }
   console.log(responseData);
@@ -483,7 +536,7 @@ function RecordActionData({data}) {
     for (let [idx, unit] of responseData[housingId].units.entries()) {
       let unitChanges = {};
       const unitKey = (
-        `${responseData[housingId].responseRecordId}:${housingId}:${idx}`);
+        `${responseData[housingId].responseRecordId}:${housingId}:idx${idx}`);
       if (!unit.ID && unitsByTempId[unitKey]) {
         unit.ID = unitsByTempId[unitKey].getCellValueAsString("ID");
       }
