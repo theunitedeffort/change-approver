@@ -4,10 +4,7 @@ import React, { useState, createContext, useContext, useRef } from "react";
 import './style.css';
 
 const RESPONSES_TABLE = "tblXy0hiHoda5UVSR";
-// TODO: Make this selectable.
-const UNITS_TABLE = "tblRtXBod9CC0mivK";  // "tblWoxbMLr5iedJ3W" San Mateo county table
 const REJECTED_CHANGES_TABLE = "tblLykRU1MNNAHv7f";
-const HOUSING_DATABASE_TABLE = "tbl8LUgXQoTYEw2Yh";  // "tblq3LUpHcY0ISzxZ" San Mateo county table
 
 const ctx = createContext();
 
@@ -384,8 +381,8 @@ function RecordActionData({data}) {
 
   // Make some table objects for use later.
   let changesTable = base.getTable(RESPONSES_TABLE);
-  let housingDbTable = base.getTable(HOUSING_DATABASE_TABLE);
-  let unitsTable = base.getTable(UNITS_TABLE);
+  let housingDbTable = base.getTable(record.getCellValueAsString("Housing DB ID"));
+  let unitsTable = base.getTable(record.getCellValueAsString("Units DB ID"));
   let rejectTable = base.getTable(REJECTED_CHANGES_TABLE);
 
 
