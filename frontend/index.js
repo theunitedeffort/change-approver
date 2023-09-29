@@ -86,7 +86,7 @@ function DeletedUnit({deletedId, fieldMap, unitsTable, rejectTable, units, chang
         <Button size="small" icon="thumbsUp" variant="primary" aria-label="Approve" onClick={() => {
           unitsTable.deleteRecordAsync(units[deletedId]);
         }} />
-        <span class="remove_highlight">Delete this unit record</span>
+        <span className="remove_highlight">Delete this unit record</span>
       </div>
     </BaseUnit>
   );
@@ -166,7 +166,7 @@ function Metadata({response, housing}) {
   }
   if (response.rawJson.userNotes) {
     notesRender = (
-      <span class="notes">
+      <span className="notes">
         Notes to reviewer: "{formatFieldValue({type:"multilineText"}, response.rawJson.userNotes)}"<br/>
       </span>
     );
