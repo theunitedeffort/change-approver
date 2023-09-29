@@ -4,9 +4,10 @@ import React, { useState, createContext, useContext, useRef } from "react";
 import './style.css';
 
 const RESPONSES_TABLE = "tblXy0hiHoda5UVSR";
-const UNITS_TABLE = "tblWoxbMLr5iedJ3W"; //"tblRtXBod9CC0mivK";  <- production table
+// TODO: Make this selectable.
+const UNITS_TABLE = "tblRtXBod9CC0mivK";  // "tblWoxbMLr5iedJ3W" San Mateo county table
 const REJECTED_CHANGES_TABLE = "tblLykRU1MNNAHv7f";
-const HOUSING_DATABASE_TABLE = "tblq3LUpHcY0ISzxZ"; //"tbl8LUgXQoTYEw2Yh" <- production table
+const HOUSING_DATABASE_TABLE = "tbl8LUgXQoTYEw2Yh";  // "tblq3LUpHcY0ISzxZ" San Mateo county table
 
 const ctx = createContext();
 
