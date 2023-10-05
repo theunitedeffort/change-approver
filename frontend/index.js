@@ -182,22 +182,7 @@ function Metadata({response, housing}) {
 }
 
 function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTable, unitsTable, rejectTable}) {
-  // Find any newly deleted units by comparing the unit IDs in the response
-  // data with the unit IDs in Airtable for this apartment.
-  const existingUnits = housing[response.housing.ID].getCellValue("UNITS");
-  let existingUnitIds = [];
-  // For some reason getCellValue can return null instead of an empty list of linked records.
-  if (existingUnits) {
-    existingUnitIds = existingUnits.map(u => u.name);
-  }
-  let updatedUnitIds = response.units.map(u => u.ID).filter(i => i);
-  let deletedUnitIds = existingUnitIds.filter(i => !updatedUnitIds.includes(i));
-  let changedUnits = response.units.filter(u => Object.keys(u.changes).length);
-  // Even if no changes were submitted, ensure that notes to the reviewer make it into the summary email.
-  if (!Object.keys(response.housing.changes).length &&
-    !deletedUnitIds.length &&
-    !changedUnits.length &&
-    !response.rawJson.userNotes) {
+  if (!aptHasChanges(housing, response)) {
     return null;
   }
   return (
@@ -232,7 +217,7 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
           linkedHousingRec={housing[response.housing.ID]}
           units={units} />
       })}
-      {deletedUnitIds.map(deletedId => {
+      {getDeletedUnitIds(housing, response).map(deletedId => {
         return <DeletedUnit
           key={deletedId}
           deletedId={deletedId}
@@ -355,13 +340,38 @@ function formatFieldValue(field, val) {
   return val
 }
 
+function getDeletedUnitIds(housing, response) {
+  // Find any newly deleted units by comparing the unit IDs in the response
+  // data with the unit IDs in Airtable for this apartment.
+  const existingUnits = housing[response.housing.ID].getCellValue("UNITS");
+  let existingUnitIds = [];
+  // For some reason getCellValue can return null instead of an empty list of linked records.
+  if (existingUnits) {
+    existingUnitIds = existingUnits.map(u => u.name);
+  }
+  let updatedUnitIds = response.units.map(u => u.ID).filter(i => i);
+  return existingUnitIds.filter(i => !updatedUnitIds.includes(i));
+}
+
+function aptHasChanges(housing, response) {
+  let changedUnits = response.units.filter(u => Object.keys(u.changes).length);
+  // Even if no changes were submitted, ensure that notes to the reviewer make it into the summary.
+  return (Object.keys(response.housing.changes).length > 0 ||
+    getDeletedUnitIds(housing, response).length > 0 ||
+    changedUnits.length > 0 ||
+    response.rawJson.userNotes != '');
+}
+
 function RecordActionDataDemoBlock() {
   // null if no buttons have been clicked, otherwise {recordId, viewId, tableId} corresponding
   // to the last click
   const recordActionData = useRecordActionData();
 
   if (recordActionData === null) {
-    return <Box padding={2}>Click a button!</Box>
+    return <Box padding={4}>
+      Run this extension by clicking the <b>Approve or Reject Changes</b> button next
+      to the updates campaign you are interested in.
+    </Box>
   }
 
   return <RecordActionData data={recordActionData} />;
@@ -638,10 +648,11 @@ function RecordActionData({data}) {
   //   }
   // }
 
-  return (
-    <Box padding={4} style={{height: "100vh", width: "100%"}}>
-      {Object.keys(responseData).map(housingId => {
-        return <Apartment
+  const aptsToRender = []
+  for (const housingId of Object.keys(responseData)) {
+    if (aptHasChanges(housing, responseData[housingId])) {
+      aptsToRender.push(
+        <Apartment
           key={housingId}
           response={responseData[housingId]}
           housing={housing}
@@ -652,10 +663,19 @@ function RecordActionData({data}) {
           unitsTable={unitsTable}
           rejectTable={rejectTable}
         />
-      })}
-      {/*<div dangerouslySetInnerHTML={{__html: htmlStrs.join("")}} />*/}
-    </Box>
-  );
+      );
+    }
+  }
+  if (aptsToRender.length > 0) {
+    return (
+      <Box padding={4} style={{height: "100vh", width: "100%"}}>
+        {aptsToRender}
+        {/*<div dangerouslySetInnerHTML={{__html: htmlStrs.join("")}} />*/}
+      </Box>
+    );
+  } else {
+    return <Box padding={4}>No changes found, nothing to display.</Box>
+  }
 }
 
 initializeBlock(() => <RecordActionDataDemoBlock />);
