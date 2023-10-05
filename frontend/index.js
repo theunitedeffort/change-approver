@@ -597,57 +597,6 @@ function RecordActionData({data}) {
 
   console.log(responseData);
 
-  // let htmlStrs = [];
-  // for (let housingId in responseData) {
-  //   let changeStrs = [];
-  //   let metadataStrs = [];
-  //   // Render changes to the Housing Database table
-  //   for (let fieldName in responseData[housingId].housing.changes) {
-  //     changeStrs.push(`<p style="padding-left:1em"><strong>${fieldName}</strong>: <span style="color:red; text-decoration:line-through">${formatFieldValue(housingFieldsByName[fieldName], responseData[housingId].housing.changes[fieldName].existing)}</span> <span style="color:green">${formatFieldValue(housingFieldsByName[fieldName], responseData[housingId].housing.changes[fieldName].updated)}</span></p>`);
-  //   }
-  //   // Render changes to the Units table
-  //   for (let unit of responseData[housingId].units) {
-  //     let unitStrs = []
-  //     let unitHeading = `<span style="background-color:#abf2bc">New Unit</span>`;
-  //     if (unit.ID) {
-  //       unitHeading = `Unit ID ${unit.ID}`;
-  //     }
-  //     for (let fieldName in unit.changes) {
-  //       unitStrs.push(`<p style="padding-left:1em"><strong>${fieldName}</strong>: <span style="color:red; text-decoration:line-through">${formatFieldValue(unitFieldsByName[fieldName], unit.changes[fieldName].existing)}</span> <span style="color:green">${formatFieldValue(unitFieldsByName[fieldName], unit.changes[fieldName].updated)}</span></p>`);
-  //     }
-  //     if (unitStrs.length) {
-  //       changeStrs.push(`<div style="border:solid #888 2px; border-radius:6px; margin:1em 1em 1em 2em; padding: 1em;"><h3>${unitHeading}</h3>${unitStrs.join("")}</div>`);
-  //     }
-  //   }
-  //   // Render any newly deleted units by comparing the unit IDs in the response
-  //   // data with the unit IDs in Airtable for this apartment.
-  //   const existingUnits = housing[housingId].getCellValue("UNITS");
-  //   let existingUnitIds = [];
-  //   // For some reason getCellValue can return null instead of an empty list of linked records.
-  //   if (existingUnits) {
-  //     existingUnitIds = existingUnits.map(u => u.name);
-  //   }
-  //   let updatedUnitIds = responseData[housingId].units.map(u => u.ID).filter(i => i);
-  //   let deletedUnitIds = existingUnitIds.filter(i => !updatedUnitIds.includes(i));
-  //   for (let deletedUnitId of deletedUnitIds) {
-  //     changeStrs.push(`<div style="border:solid #888 2px; border-radius:6px; margin:1em 1em 1em 2em; padding: 1em;"><h3><span style="background-color:#ffc0c0">Deleted Unit ID ${deletedUnitId}</span></h3></div>`);
-  //   }
-
-  //   // Even if no changes were submitted, ensure that notes to the reviwer make it into the summary email.
-  //   if (changeStrs.length || responseData[housingId].rawJson.userNotes) {
-  //     metadataStrs.push(`ID ${housingId}`);
-  //     metadataStrs.push(`Display ID ${housing[housingId].getCellValueAsString("DISPLAY_ID")}`);
-  //     if (responseData[housingId].rawJson.user_name){
-  //       metadataStrs.push(`Submitted by ${responseData[housingId].rawJson.user_name}`);
-  //     }
-  //     if (responseData[housingId].rawJson.userNotes) {
-  //       metadataStrs.push(`Notes to reviewer: "${formatFieldValue({type:"multilineText"}, responseData[housingId].rawJson.userNotes)}"`);
-  //     }
-  //     let recordLink = `https://airtable.com/apphE4mk8YDqyHM0I/tblq3LUpHcY0ISzxZ/viw8aa14PoQNBYQgX/${housing[housingId].id}?blocks=hide`
-  //     htmlStrs.push(`<div style="border-bottom:solid #888 1px;"><h2><a href="${recordLink}" target="_blank" rel="noopener">${housing[housingId].getCellValueAsString("APT_NAME")}</a></h2>${metadataStrs.join("<br/>")}${changeStrs.join("")}</div>`);
-  //   }
-  // }
-
   const aptsToRender = []
   for (const housingId of Object.keys(responseData)) {
     if (aptHasChanges(housing, responseData[housingId])) {
@@ -670,7 +619,6 @@ function RecordActionData({data}) {
     return (
       <Box padding={4} style={{height: "100vh", width: "100%"}}>
         {aptsToRender}
-        {/*<div dangerouslySetInnerHTML={{__html: htmlStrs.join("")}} />*/}
       </Box>
     );
   } else {
