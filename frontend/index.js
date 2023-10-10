@@ -261,9 +261,11 @@ function fieldValuesEqual(field, existingVal, updatedVal) {
   let existing = existingVal;
   let updated = updatedVal;
   if (field.type == "phoneNumber") {
-    let phoneRegex = /[\s-()]/g
-    existing = existing.replace(phoneRegex, "");
-    updated = updated.replace(phoneRegex, "");
+    function standardizePhoneStr(val) {
+      return val.replace(/[\s-()]/g, "");
+    }
+    existing = standardizePhoneStr(existing);
+    updated = standardizePhoneStr(updated);
   } else if (field.type == "checkbox") {
     function standardizeCheckboxStr(val) {
       if (!val) {
@@ -320,6 +322,13 @@ function formatFieldValue(field, val) {
     } else {
       //return "&#9744"
       return "no";
+    }
+  } else if (field.type == "phoneNumber") {
+    const digits = val.replace(/[^\d]/g, "");
+    if (digits.length == 10) {
+      return `(${digits.substring(0, 3)}) ${digits.substring(3, 6)}-${digits.substring(6, 10)}`;
+    } else {
+      return val;
     }
   } else if (field.type == "number") {
     let parsed = parseFloat(val);
