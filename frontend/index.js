@@ -160,21 +160,21 @@ function Metadata({response, housing}) {
   if (response.rawJson.user_name) {
     userRender = (
       <>
-        Submitted by {response.rawJson.user_name}<br/>
+        <strong>Submitted by</strong> {response.rawJson.user_name}<br/>
       </>
     );
   }
   if (response.rawJson.userNotes) {
     notesRender = (
       <span className="notes">
-        Notes to reviewer: "{formatFieldValue({type:"multilineText"}, response.rawJson.userNotes)}"<br/>
+        <strong>Notes to reviewer</strong> "{formatFieldValue({type:"multilineText"}, response.rawJson.userNotes)}"<br/>
       </span>
     );
   }
   return (
     <>
-    ID {response.housing.ID}<br/>
-    Display ID {housing[response.housing.ID].getCellValueAsString("DISPLAY_ID")}<br/>
+    <strong>ID</strong> {response.housing.ID}<br/>
+    <strong>Display ID</strong> {housing[response.housing.ID].getCellValueAsString("DISPLAY_ID")}<br/>
     {userRender}
     {notesRender}
     </>

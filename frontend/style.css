@@ -72,6 +72,8 @@ button {
 }
 
 .apartment {
-	margin-bottom: 6em;
+	margin-bottom: 4em;
+	max-width: 62.5em;
+	padding: 1em;
 }
 
