@@ -32,12 +32,14 @@ button {
 .unit {
 	border: solid #888 2px;
 	border-radius: 6px;
+	background-color: #eee;
 	margin: 1em 1em 1em 2em;
 	padding: 1em;
 }
 
 .unit_record_card {
 	width: 100% !important;
+	max-width: 47em;
 }
 
 .unit_record_card > div > div:nth-child(2) {
@@ -70,6 +72,6 @@ button {
 }
 
 .apartment {
-	border-bottom: solid #888 1px;
+	margin-bottom: 6em;
 }
 
