@@ -136,7 +136,7 @@ function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}
         </Button>
       </p>
       <div ref={containerRef}>
-      {Object.keys(unit.changes).map(fieldName => {
+      {Object.keys(unit.changes).toSorted().map(fieldName => {
         const change = unit.changes[fieldName];
         return <Change
           key={change.key}
@@ -195,7 +195,7 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
         </TextButton>
       </h2>
       <Metadata response={response} housing={housing} />
-      {Object.keys(response.housing.changes).map(fieldName => {
+      {Object.keys(response.housing.changes).toSorted().map(fieldName => {
         const change = response.housing.changes[fieldName];
         return (
           <Change
