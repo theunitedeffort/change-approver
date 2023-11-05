@@ -1,4 +1,4 @@
-import {Icon, Box, Button, TextButton, RecordCard, SelectButtons, initializeBlock, useRecordActionData, useBase, useRecordById, useRecords, expandRecord} from '@airtable/blocks/ui';
+import {Icon, Box, Button, TextButton, Text, RecordCard, SelectButtons, initializeBlock, useRecordActionData, useBase, useRecordById, useRecords, expandRecord} from '@airtable/blocks/ui';
 import React, { useState, createContext, useContext, useRef } from "react";
 
 import './style.css';
@@ -167,7 +167,7 @@ function Metadata({response, housing}) {
   if (response.rawJson.userNotes) {
     notesRender = (
       <span className="notes">
-        <strong>Notes to reviewer</strong> "{formatFieldValue({type:"multilineText"}, response.rawJson.userNotes)}"<br/>
+        <strong>Notes to reviewer</strong> <Text style={{whiteSpace: 'pre-wrap'}} as="span">"{response.rawJson.userNotes}"</Text><br/>
       </span>
     );
   }
