@@ -622,10 +622,15 @@ function RecordActionData({data}) {
     }
   }
 
+  // Get a list of IDs sorted by response timestamp (oldest first).
+  const sortedIds = Object.keys(responseData).toSorted((a, b) => {
+    return responseData[a].timestamp - responseData[b].timestamp;
+  });
+
   console.log(responseData);
 
   const aptsToRender = []
-  for (const housingId of Object.keys(responseData)) {
+  for (const housingId of sortedIds) {
     if (aptHasChanges(housing, responseData[housingId])) {
       aptsToRender.push(
         <Apartment
