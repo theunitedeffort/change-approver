@@ -171,11 +171,28 @@ function Metadata({response, housing}) {
       </span>
     );
   }
+  const now = new Date();
+  const durationSec = (now - response.timestamp) / 1000;
+  let durationStr = '';
+  if (durationSec < 60) {
+    durationStr = `${durationSec.toFixed(0)}s`;
+  } else if (durationSec < 60 * 60) {
+    durationStr = `${(durationSec / 60).toFixed(0)}min`;
+  } else if (durationSec <  60 * 60 * 24) {
+    durationStr = `${(durationSec / (60 * 60)).toFixed(0)}hr`;
+  } else if (durationSec <  60 * 60 * 24 * 30.4167) {
+    durationStr = `${(durationSec / (60 * 60 * 24)).toFixed(0)}d`;
+  } else if (durationSec <  60 * 60 * 24 * 30.4167 * 12) {
+    durationStr = `${(durationSec / (60 * 60 * 24 * 30.4167)).toFixed(0)}mo`;
+  } else {
+    durationStr = `${(durationSec / (60 * 60 * 24 * 30.4167 * 12)).toFixed(0)}yr`;
+  }
   return (
     <>
     <strong>ID</strong> {response.housing.ID}<br/>
     <strong>Display ID</strong> {housing[response.housing.ID].getCellValueAsString("DISPLAY_ID")}<br/>
     {userRender}
+    <strong>Submitted on</strong> {response.timestamp.toLocaleString()} ({durationStr} ago)<br/>
     {notesRender}
     </>
   );
@@ -443,7 +460,7 @@ function RecordActionData({data}) {
 
   // Get all form responses submitted to date.
   let formResponses = useRecords(changesTable,
-    {fields: ["FORM_RESPONSE_JSON", "CAMPAIGN"],
+    {fields: ["FORM_RESPONSE_JSON", "CAMPAIGN", "FORM_SUBMITTED_DATETIME"],
     // Sort ascending by date added so that newer form responses will
     // overwrite older ones in our processing below.
     sorts: [{field: "DATETIME_ADDED", direction: "asc"}]}
@@ -456,8 +473,9 @@ function RecordActionData({data}) {
       // Only process records matching the campaign of interest.
       continue;
     }
+    let datetime = new Date(record.getCellValue("FORM_SUBMITTED_DATETIME"));
     let response = JSON.parse(record.getCellValue("FORM_RESPONSE_JSON"));
-    responseData[response.ID] = {housing: {}, units: {}, rawJson: response, responseRecordId: record.id};
+    responseData[response.ID] = {housing: {}, units: {}, rawJson: response, responseRecordId: record.id, timestamp: datetime};
     // Un-flatten form response data by nesting offering-level data inside
     // their parent unit and units-level data inside their parent apartment.
     // First, we sort data into apartment, unit, or offering-level.
