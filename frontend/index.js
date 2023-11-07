@@ -27,7 +27,6 @@ function Change({field, change, targetTable, targetRecord, rejectTable, linkedHo
         if (targetRecord) {
           targetTable.updateRecordAsync(targetRecord, {[field.name]: convertForField(field, change.updated)});
         } else {
-          // TODO: add a new field that links the new unit back to the response id and unit index.
           targetTable.createRecordAsync({
             'HOUSING_LIST_ID': [{id: linkedHousingRec.id}],
             // Remove field name portion of the change key so it applies to the
@@ -115,26 +114,13 @@ function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}
   if (!Object.keys(unit.changes).length) {
     return null;
   }
+  // TODO: "approve all" will create new records for each field in a new unit
+  // instead of only creating a new record for the first field and then applying
+  // subsequent fields to that new record.  This may be because the old method
+  // for "approve all" (i.e. click all individual approve buttons programmatically)
+  // was too fast.
   return (
     <BaseUnit header={unitHeading} card={card}>
-      <p>
-        <Button icon="x" variant="danger" onClick={() => {
-          const buttons = containerRef.current.querySelectorAll('.reject');
-          for (const button of buttons) {
-            button.click();
-          }
-        }}>
-          Reject all
-        </Button>
-        <Button icon="thumbsUp" variant="primary" onClick={() => {
-          const buttons = containerRef.current.querySelectorAll('.approve');
-          for (const button of buttons) {
-            button.click();
-          }
-        }}>
-          Approve all
-        </Button>
-      </p>
       <div ref={containerRef}>
       {Object.keys(unit.changes).toSorted().map(fieldName => {
         const change = unit.changes[fieldName];
