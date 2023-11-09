@@ -167,7 +167,7 @@ function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units,
   );
 }
 
-function Metadata({response, housing}) {
+function Metadata({response, housing, rejectTable}) {
   let userRender = "";
   let notesRender = "";
   if (response.rawJson.user_name) {
@@ -177,11 +177,20 @@ function Metadata({response, housing}) {
       </>
     );
   }
-  if (response.rawJson.userNotes) {
+  if (response.notes.value) {
     notesRender = (
+      <>
       <span className="notes">
-        <strong>Notes to reviewer</strong> <Text style={{whiteSpace: 'pre-wrap'}} as="span">"{response.rawJson.userNotes}"</Text><br/>
+        <strong>Notes to reviewer</strong> <Text style={{whiteSpace: 'pre-wrap'}} as="span">"{response.notes.value}"</Text>
+      &nbsp;
+      <TextButton onClick={() => {
+        rejectTable.createRecordAsync({"KEY": response.notes.key})
+      }}>
+        Acknowledge & hide notes
+      </TextButton>
       </span>
+      <br/>
+      </>
     );
   }
   const now = new Date();
@@ -230,7 +239,7 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
         recordType="apartment"
         responseTimestamp={response.timestamp}
         lastModifiedTimestamp={lastModified} />
-      <Metadata response={response} housing={housing} />
+      <Metadata response={response} housing={housing} rejectTable={rejectTable} />
       {Object.keys(response.housing.changes).toSorted().map(fieldName => {
         const change = response.housing.changes[fieldName];
         return (
@@ -407,7 +416,7 @@ function aptHasChanges(housing, response) {
   return (Object.keys(response.housing.changes).length > 0 ||
     getDeletedUnitIds(housing, response).length > 0 ||
     changedUnits.length > 0 ||
-    response.rawJson.userNotes != '');
+    response.notes.value != '');
 }
 
 function RecordActionDataDemoBlock() {
@@ -423,6 +432,10 @@ function RecordActionDataDemoBlock() {
   }
 
   return <RecordActionData data={recordActionData} />;
+}
+
+function makeChangeKey(responseId, housingId, unitIdx, fieldName) {
+  return `${responseId}:${housingId}:${unitIdx}:${fieldName}`;
 }
 
 function RecordActionData({data}) {
@@ -590,20 +603,26 @@ function RecordActionData({data}) {
 
   // Find differences between the form response data and the data stored in
   // Airtable.
-  // need to handle differences in representation:
-  //   multiselect ordering
-  let changes = {};
   for (let housingId in responseData) {
     //changes[housingId] = {housing:{}, units:[]};
+    const notesKey = makeChangeKey(
+      responseData[housingId].responseRecordId, housingId, '-', 'userNotes');
+    let notesValue = responseData[housingId].rawJson.userNotes;
+    if (rejects.includes(notesKey)) {
+      notesValue = ''
+    }
+    responseData[housingId].notes = {
+      value: notesValue,
+      key: notesKey
+    };
     responseData[housingId].housing.changes = {}
     for (let dbField in housingFieldsByName){
       if (!responseData[housingId].housing.hasOwnProperty(dbField)) {
         continue;
       }
       let existingVal = housing[housingId].getCellValueAsString(dbField);
-      // TODO: Filter out changes that have been rejected in the past.
       // change key format is responseID:housingId:unitIdx:fieldName
-      const changeKey = `${responseData[housingId].responseRecordId}:${housingId}:-:${dbField}`;
+      const changeKey = makeChangeKey(responseData[housingId].responseRecordId, housingId, '-', dbField);
       let newVal = responseData[housingId].housing[dbField];
       if (rejects.includes(changeKey)) {
         newVal = existingVal;
@@ -626,7 +645,9 @@ function RecordActionData({data}) {
         if (!unit.hasOwnProperty(dbField)) {
           continue;
         }
-        const changeKey = `${unitKey}:${dbField}`;
+        const changeKey = makeChangeKey(
+          responseData[housingId].responseRecordId, housingId, `idx${idx}`,
+          dbField);
         let existingVal = "";
         if (unitId) {
           existingVal = units[unitId].getCellValueAsString(dbField);
