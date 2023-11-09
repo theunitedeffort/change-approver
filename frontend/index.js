@@ -5,8 +5,26 @@ import './style.css';
 
 const RESPONSES_TABLE = "tblXy0hiHoda5UVSR";
 const REJECTED_CHANGES_TABLE = "tblLykRU1MNNAHv7f";
+const IGNORE_CONFLICT_MIN = 10;
 
 const ctx = createContext();
+
+function ConflictWarning({recordType, responseTimestamp, lastModifiedTimestamp}) {
+  const now = new Date();
+  // Check if the record was modified after the response was submitted.
+  // Allow for a few minutes of buffer to avoid showing this warning the moment
+  // a suggestion is approved.
+  if (lastModifiedTimestamp > responseTimestamp &&
+      (now - lastModifiedTimestamp) > 1000 * 60 * IGNORE_CONFLICT_MIN) {
+    return(
+      <p className="conflict_warning">
+        This {recordType} record has been modified since the responses below
+        were received. The changes suggested below may be out of date
+      </p>
+    );
+  }
+  return null;
+}
 
 function Change({field, change, targetTable, targetRecord, rejectTable, linkedHousingRec, housingLinkField}) {
   const oldRender = (
@@ -44,17 +62,21 @@ function Change({field, change, targetTable, targetRecord, rejectTable, linkedHo
   );
 }
 
-function BaseUnit({header, card, children}) {
+function BaseUnit({header, responseTimestamp, lastModifiedTimestamp, card, children}) {
   return (
     <div className="unit">
       <h3>{header}</h3>
+      <ConflictWarning
+        recordType="unit"
+        responseTimestamp={responseTimestamp}
+        lastModifiedTimestamp={lastModifiedTimestamp} />
       {card}
       {children}
     </div>
   );
 }
 
-function DeletedUnit({deletedId, fieldMap, unitsTable, rejectTable, units, changeKey}) {
+function DeletedUnit({deletedId, fieldMap, unitsTable, rejectTable, units, changeKey, responseTimestamp}) {
   const header = (
     <TextButton onClick={() => expandRecord(units[deletedId])} icon="expand">
       {`Unit ID ${deletedId}`}
@@ -72,8 +94,10 @@ function DeletedUnit({deletedId, fieldMap, unitsTable, rejectTable, units, chang
       ]}
     />;
   }
+  const lastModified = new Date(
+    units[deletedId].getCellValue("LAST_MODIFIED_DATETIME"));
   return (
-    <BaseUnit header={header} card={card}>
+    <BaseUnit header={header} card={card} responseTimestamp={responseTimestamp} lastModifiedTimestamp={lastModified} >
       <div className="change">
         <Button style={{display: "none"}} size="small" icon="x" variant="danger" aria-label="Reject" onClick={() => {
           // TODO: If a unit deletion is rejected and there are also edits
@@ -91,10 +115,11 @@ function DeletedUnit({deletedId, fieldMap, unitsTable, rejectTable, units, chang
   );
 }
 
-function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}) {
+function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units, responseTimestamp}) {
   const containerRef = useRef(null);
   let unitHeading = <span className="add_highlight">New Unit</span>;
   let card = null;
+  let lastModified = 0;
   if (unit.ID) {
     unitHeading = (
       <TextButton onClick={() => expandRecord(units[unit.ID])} icon="expand">
@@ -110,6 +135,8 @@ function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}
         fieldMap["RENT_PER_MONTH_USD"],
       ]}
     />;
+    lastModified = new Date(
+      units[unit.ID].getCellValue("LAST_MODIFIED_DATETIME"));
   }
   if (!Object.keys(unit.changes).length) {
     return null;
@@ -120,7 +147,7 @@ function Unit({unit, fieldMap, unitsTable, rejectTable, linkedHousingRec, units}
   // for "approve all" (i.e. click all individual approve buttons programmatically)
   // was too fast.
   return (
-    <BaseUnit header={unitHeading} card={card}>
+    <BaseUnit header={unitHeading} card={card} responseTimestamp={responseTimestamp} lastModifiedTimestamp={lastModified}>
       <div ref={containerRef}>
       {Object.keys(unit.changes).toSorted().map(fieldName => {
         const change = unit.changes[fieldName];
@@ -188,6 +215,8 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
   if (!aptHasChanges(housing, response)) {
     return null;
   }
+  const lastModified = new Date(
+    housing[response.housing.ID].getCellValue("LAST_MODIFIED_DATETIME"));
   return (
     <div className="apartment">
       <h2>
@@ -197,6 +226,10 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
           {housing[response.housing.ID].getCellValueAsString("APT_NAME")}
         </TextButton>
       </h2>
+      <ConflictWarning
+        recordType="apartment"
+        responseTimestamp={response.timestamp}
+        lastModifiedTimestamp={lastModified} />
       <Metadata response={response} housing={housing} />
       {Object.keys(response.housing.changes).toSorted().map(fieldName => {
         const change = response.housing.changes[fieldName];
@@ -218,7 +251,9 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
           unitsTable={unitsTable}
           rejectTable={rejectTable}
           linkedHousingRec={housing[response.housing.ID]}
-          units={units} />
+          units={units}
+          responseTimestamp={response.timestamp}
+        />
       })}
       {getDeletedUnitIds(housing, response).map(deletedId => {
         return <DeletedUnit
@@ -229,6 +264,7 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
           rejectTable={rejectTable}
           units={units}
           changeKey={`${response.responseRecordId}:${response.housing.ID}:${deletedId}`}
+          responseTimestamp={response.timestamp}
         />
       })}
     </div>
