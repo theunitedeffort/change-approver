@@ -100,11 +100,15 @@ function DeletedUnit({deletedId, fieldMap, unitsTable, rejectTable, units, chang
   return (
     <BaseUnit header={header} card={card} responseTimestamp={responseTimestamp} lastModifiedTimestamp={lastModified} >
       <div className="change">
-        <Button style={{display: "none"}} size="small" icon="x" variant="danger" aria-label="Reject" onClick={() => {
+        <div>
+          <b>
+            Note: If you reject this proposed unit deletion, manually verify this unit's data is up-to-date because the respondent did not do so.
+          </b>
+        </div>
+        <Button size="small" icon="x" variant="danger" aria-label="Reject" onClick={() => {
           // TODO: If a unit deletion is rejected and there are also edits
           // to the type, status, or occupancy, how do we apply those changes
-          // after the rejection?  For now, hide the reject option until that
-          // gets figured out.
+          // after the rejection?
           rejectTable.createRecordAsync({"KEY": `${changeKey}:DELETE`})
         }} />
         <Button size="small" icon="thumbsUp" variant="primary" aria-label="Approve" onClick={() => {
@@ -221,8 +225,8 @@ function Metadata({response, housing, rejectTable}) {
   );
 }
 
-function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTable, unitsTable, rejectTable}) {
-  if (!aptHasChanges(housing, response)) {
+function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTable, unitsTable, rejectTable, rejectedDeletes}) {
+  if (!aptHasChanges(housing, response, rejectedDeletes)) {
     return null;
   }
   const lastModified = new Date(
@@ -265,7 +269,7 @@ function Apartment({response, housing, units, fieldMap, unitsFieldMap, housingTa
           responseTimestamp={response.timestamp}
         />
       })}
-      {getDeletedUnitIds(housing, response).map(deletedId => {
+      {getDeletedUnitIds(housing, response, rejectedDeletes).map(deletedId => {
         return <DeletedUnit
           key={deletedId}
           deletedId={deletedId}
@@ -398,7 +402,7 @@ function formatFieldValue(field, val) {
   return val
 }
 
-function getDeletedUnitIds(housing, response) {
+function getDeletedUnitIds(housing, response, rejectedDeletes) {
   // Find any newly deleted units by comparing the unit IDs in the response
   // data with the unit IDs in Airtable for this apartment.
   const existingUnits = housing[response.housing.ID].getCellValue("UNITS");
@@ -407,15 +411,15 @@ function getDeletedUnitIds(housing, response) {
   if (existingUnits) {
     existingUnitIds = existingUnits.map(u => u.name);
   }
-  let updatedUnitIds = response.units.map(u => u.ID).filter(i => i);
-  return existingUnitIds.filter(i => !updatedUnitIds.includes(i));
+  let responseUnitIds = response.units.map(u => u.ID).filter(i => i);
+  return existingUnitIds.filter(i => !responseUnitIds.includes(i) && !rejectedDeletes.includes(i));
 }
 
-function aptHasChanges(housing, response) {
+function aptHasChanges(housing, response, rejectedDeletes) {
   let changedUnits = response.units.filter(u => Object.keys(u.changes).length);
   // Even if no changes were submitted, ensure that notes to the reviewer make it into the summary.
   return (Object.keys(response.housing.changes).length > 0 ||
-    getDeletedUnitIds(housing, response).length > 0 ||
+    getDeletedUnitIds(housing, response, rejectedDeletes).length > 0 ||
     changedUnits.length > 0 ||
     response.notes.value != '');
 }
@@ -504,6 +508,7 @@ function RecordActionData({data}) {
 
   // Build a map of form responses indexed by Airtable ID.
   let responseData = {};
+  let rejectedDeletes = [];
   for (let record of formResponses) {
     if (record.getCellValueAsString("CAMPAIGN") !== CAMPAIGN) {
       // Only process records matching the campaign of interest.
@@ -593,11 +598,10 @@ function RecordActionData({data}) {
 
     // Check for any units with a rejected proposal for deletion.
     // TODO: Figure out what to do after finding the rejected deletes.
-    const rejectedDeletes = rejects.filter(
-      r => r.match(new RegExp(`${record.id}:${response.ID}:(\\d+):DELETE`)));
-    for (const rejectedDelete of rejectedDeletes) {
-      const unitId = rejectedDelete[1];
-    }
+    const pattern = new RegExp(`${record.id}:${response.ID}:(\\d+):DELETE`);
+    const deleteIgnoreIds = rejects.filter((r) => pattern.test(r))
+      .map((r) => r.match(pattern)[1]);
+    rejectedDeletes = rejectedDeletes.concat(deleteIgnoreIds);
     responseData[response.ID].units = flatUnits;
   }
   console.log(responseData);
@@ -680,7 +684,7 @@ function RecordActionData({data}) {
 
   const aptsToRender = []
   for (const housingId of sortedIds) {
-    if (aptHasChanges(housing, responseData[housingId])) {
+    if (aptHasChanges(housing, responseData[housingId], rejectedDeletes)) {
       aptsToRender.push(
         <Apartment
           key={housingId}
@@ -692,6 +696,7 @@ function RecordActionData({data}) {
           housingTable={housingDbTable}
           unitsTable={unitsTable}
           rejectTable={rejectTable}
+          rejectedDeletes={rejectedDeletes}
         />
       );
     }
