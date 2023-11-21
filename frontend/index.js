@@ -639,6 +639,11 @@ function RecordActionData({data}) {
       if (!unit.ID && unitsByTempId[unitKey]) {
         unit.ID = unitsByTempId[unitKey].getCellValueAsString("ID");
       }
+      if (unit.ID && !units[unit.ID]) {
+        // Unit ID exists in the form response, but does not exist in the DB
+        // due to manual deletion.  It should be treated as a new unit.
+        unit.ID = "";
+      }
       let unitId = unit.ID || ""
       unit.changes = {};
       for (let dbField in unitFieldsByName) {
