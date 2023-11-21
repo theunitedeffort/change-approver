@@ -83,7 +83,10 @@ function DeletedUnit({deletedId, fieldMap, unitsTable, rejectTable, units, chang
     </TextButton>
   );
   let card = <p>Deleting...</p>;
+  let lastModified = 0;
   if (units[deletedId]) {
+    lastModified = new Date(
+      units[deletedId].getCellValue("LAST_MODIFIED_DATETIME"));
     card = <RecordCard
       className="unit_record_card"
       record={units[deletedId]}
@@ -94,8 +97,6 @@ function DeletedUnit({deletedId, fieldMap, unitsTable, rejectTable, units, chang
       ]}
     />;
   }
-  const lastModified = new Date(
-    units[deletedId].getCellValue("LAST_MODIFIED_DATETIME"));
   return (
     <BaseUnit header={header} card={card} responseTimestamp={responseTimestamp} lastModifiedTimestamp={lastModified} >
       <div className="change">
